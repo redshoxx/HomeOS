@@ -11,6 +11,55 @@ for update
 using (owner_id = auth.uid())
 with check (owner_id = auth.uid());
 
+drop policy if exists members_visible_to_members on public.household_members;
+create policy members_visible_to_members
+on public.household_members
+for select
+using (
+  public.is_household_member(household_id)
+  or exists (
+    select 1
+    from public.households h
+    where h.id = household_id
+      and h.owner_id = auth.uid()
+  )
+);
+
+drop policy if exists members_owner_insert on public.household_members;
+create policy members_owner_insert
+on public.household_members
+for insert
+with check (
+  user_id = auth.uid()
+  and exists (
+    select 1
+    from public.households h
+    where h.id = household_id
+      and h.owner_id = auth.uid()
+  )
+);
+
+drop policy if exists members_owner_update on public.household_members;
+create policy members_owner_update
+on public.household_members
+for update
+using (
+  exists (
+    select 1
+    from public.households h
+    where h.id = household_id
+      and h.owner_id = auth.uid()
+  )
+)
+with check (
+  exists (
+    select 1
+    from public.households h
+    where h.id = household_id
+      and h.owner_id = auth.uid()
+  )
+);
+
 create or replace function public.ensure_household_owner_member(target uuid)
 returns void
 language plpgsql
