@@ -2,13 +2,14 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Screen } from '@/components/Screen';
-import { Heading } from '@/components/Heading';
-import { Card } from '@/components/Card';
 import { EmptyState } from '@/components/EmptyState';
+import { SwipeActionRow } from '@/components/SwipeActionRow';
 import { addShoppingItem, deleteShoppingItem, getDefaultList, listItems, toggleShoppingItem } from '@/repositories/shoppingRepo';
 import type { ShoppingItem } from '@/types/models';
 import { useAppStore } from '@/store/appStore';
 import { colors, radius, spacing } from '@/theme/theme';
+
+const messageOf = (error: unknown) => error instanceof Error ? error.message : 'Unbekannter Fehler';
 
 export default function Shopping() {
   const householdId = useAppStore(s => s.activeHouseholdId);
@@ -26,80 +27,77 @@ export default function Shopping() {
     setItems(list ? await listItems(list.id) : []);
   }, [householdId]);
 
-  useEffect(() => {
-    void load().catch(error => {
-      console.error('Einkauf konnte nicht geladen werden', error);
-      Alert.alert('Einkauf', 'Die Einkaufsliste konnte nicht geladen werden.');
-    });
-  }, [load, revision]);
+  useEffect(() => { void load().catch(error => Alert.alert('Einkauf', messageOf(error))); }, [load, revision]);
 
   const openItems = useMemo(() => items.filter(item => item.checked !== 1), [items]);
   const doneItems = useMemo(() => items.filter(item => item.checked === 1), [items]);
+  const progress = items.length ? Math.round((doneItems.length / items.length) * 100) : 0;
 
   const add = async () => {
     if (!listId || !itemName.trim() || busy) return;
     setBusy(true);
-    try {
-      await addShoppingItem(listId, itemName);
-      setItemName('');
-      await load();
-      bump();
-    } catch (error) {
-      Alert.alert('Speichern fehlgeschlagen', error instanceof Error ? error.message : 'Unbekannter Fehler');
-    } finally {
-      setBusy(false);
-    }
+    try { await addShoppingItem(listId, itemName.trim()); setItemName(''); await load(); bump(); }
+    catch (error) { Alert.alert('Speichern fehlgeschlagen', messageOf(error)); }
+    finally { setBusy(false); }
   };
 
   const toggle = async (item: ShoppingItem) => {
     if (busy) return;
     setBusy(true);
-    try {
-      await toggleShoppingItem(item.id, item.checked !== 1);
-      await load();
-      bump();
-    } catch (error) {
-      Alert.alert('Änderung fehlgeschlagen', error instanceof Error ? error.message : 'Unbekannter Fehler');
-    } finally {
-      setBusy(false);
-    }
+    try { await toggleShoppingItem(item.id, item.checked !== 1); await load(); bump(); }
+    catch (error) { Alert.alert('Änderung fehlgeschlagen', messageOf(error)); }
+    finally { setBusy(false); }
   };
 
-  const remove = (item: ShoppingItem) => Alert.alert(item.name, 'Dieses Produkt wirklich löschen?', [
-    { text: 'Abbrechen', style: 'cancel' },
-    { text: 'Löschen', style: 'destructive', onPress: () => void deleteShoppingItem(item.id).then(load).then(bump).catch(error => Alert.alert('Löschen fehlgeschlagen', error instanceof Error ? error.message : 'Unbekannter Fehler')) },
-  ]);
+  const remove = async (item: ShoppingItem) => {
+    if (busy) return;
+    setBusy(true);
+    try { await deleteShoppingItem(item.id); await load(); bump(); }
+    catch (error) { Alert.alert('Löschen fehlgeschlagen', messageOf(error)); }
+    finally { setBusy(false); }
+  };
 
-  if (!householdId) return <Screen><EmptyState title="Kein Haushalt aktiv" body="Öffne HomeOS neu oder richte einen Haushalt ein." icon="home-outline" /></Screen>;
+  if (!householdId) return <Screen><EmptyState title="Kein Haushalt aktiv" body="Richte zuerst deinen Haushalt ein." icon="home-outline" /></Screen>;
 
-  const renderItem = (item: ShoppingItem) => (
-    <View key={item.id} style={styles.itemRow}>
-      <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: item.checked === 1 }} onPress={() => void toggle(item)} style={[styles.check, item.checked === 1 && styles.checked]}>
-        {item.checked === 1 ? <Ionicons name="checkmark" size={17} color="#fff" /> : null}
+  const row = (item: ShoppingItem) => {
+    const checked = item.checked === 1;
+    return <SwipeActionRow key={item.id} disabled={busy} onDelete={() => void remove(item)} onPrimaryAction={() => void toggle(item)} primaryLabel={checked ? 'Zurück' : 'Erledigt'} primaryIcon={checked ? 'arrow-undo-outline' : 'checkmark-circle-outline'}>
+      <Pressable onPress={() => void toggle(item)} style={({ pressed }) => [styles.itemRow, pressed && styles.pressedRow]}>
+        <View style={[styles.itemIcon, checked && styles.itemIconDone]}><Ionicons name={checked ? 'checkmark' : 'basket-outline'} size={20} color={checked ? '#fff' : colors.accent} /></View>
+        <View style={styles.flex}><Text style={[styles.itemName, checked && styles.done]} numberOfLines={1}>{item.name}</Text><Text style={styles.meta}>{item.quantity} {item.unit ?? 'Stk.'}{item.category ? ` · ${item.category}` : ''}</Text></View>
+        <Ionicons name="chevron-back-outline" size={17} color={colors.textSoft} />
       </Pressable>
-      <Pressable style={styles.itemTextWrap} onPress={() => void toggle(item)}>
-        <Text style={[styles.itemText, item.checked === 1 && styles.done]}>{item.name}</Text>
-        <Text style={styles.meta}>{item.quantity} {item.unit ?? 'Stk.'}</Text>
-      </Pressable>
-      <Pressable accessibilityLabel={`${item.name} löschen`} hitSlop={10} onPress={() => remove(item)} style={styles.deleteButton}>
-        <Ionicons name="trash-outline" size={19} color={colors.textMuted} />
-      </Pressable>
-    </View>
-  );
+    </SwipeActionRow>;
+  };
+
+  const group = (title: string, subtitle: string, data: ShoppingItem[]) => data.length ? <View style={styles.group}>
+    <View style={styles.sectionHead}><View><Text style={styles.sectionTitle}>{title}</Text><Text style={styles.meta}>{subtitle}</Text></View><View style={styles.badge}><Text style={styles.badgeText}>{data.length}</Text></View></View>
+    <View style={styles.rows}>{data.map(row)}</View>
+  </View> : null;
 
   return <Screen>
-    <Heading title="Einkauf" subtitle={`${openItems.length} offen · ${doneItems.length} erledigt`} />
-    <Card><View style={styles.addRow}>
-      <View style={styles.inputWrap}><Ionicons name="basket-outline" size={20} color={colors.textMuted} /><TextInput style={styles.input} placeholder="Was brauchst du?" placeholderTextColor={colors.textSoft} value={itemName} onChangeText={setItemName} onSubmitEditing={() => void add()} editable={!busy} returnKeyType="done" /></View>
-      <Pressable disabled={busy || !itemName.trim()} style={({ pressed }) => [styles.addButton, (busy || !itemName.trim()) && styles.disabled, pressed && styles.pressed]} onPress={() => void add()}><Ionicons name="add" size={26} color="#fff" /></Pressable>
-    </View></Card>
-    {items.length === 0 ? <EmptyState title="Liste ist leer" body="Füge oben dein erstes Produkt hinzu. HomeOS speichert es sofort lokal." icon="cart-outline" /> : <>
-      {openItems.length > 0 ? <Card><View style={styles.sectionHeader}><Text style={styles.sectionTitle}>Offen</Text><Text style={styles.counter}>{openItems.length}</Text></View><View style={styles.divider} />{openItems.map(renderItem)}</Card> : null}
-      {doneItems.length > 0 ? <Card><View style={styles.sectionHeader}><Text style={styles.sectionTitle}>Erledigt</Text><Text style={styles.counter}>{doneItems.length}</Text></View><View style={styles.divider} />{doneItems.map(renderItem)}</Card> : null}
-    </>}
+    <View style={styles.hero}><View style={styles.flex}><Text style={styles.kicker}>EINKAUFSLISTE</Text><Text style={styles.h1}>Einkauf</Text><Text style={styles.sub}>{openItems.length} offen · {doneItems.length} erledigt</Text></View><View style={styles.heroIcon}><Ionicons name="cart-outline" size={25} color={colors.accent} /></View></View>
+
+    <View style={styles.progressCard}>
+      <View style={styles.progressTop}><View><Text style={styles.progressLabel}>FORTSCHRITT</Text><Text style={styles.progressValue}>{progress}%</Text></View><View style={styles.progressNumbers}><View><Text style={styles.number}>{openItems.length}</Text><Text style={styles.numberLabel}>offen</Text></View><View style={styles.divider} /><View><Text style={styles.number}>{doneItems.length}</Text><Text style={styles.numberLabel}>erledigt</Text></View></View></View>
+      <View style={styles.track}><View style={[styles.bar, { width: `${progress}%` }]} /></View>
+    </View>
+
+    <View style={styles.composer}>
+      <View style={styles.composerHead}><View style={styles.composerIcon}><Ionicons name="add-outline" size={20} color={colors.accent} /></View><View style={styles.flex}><Text style={styles.composerTitle}>Produkt hinzufügen</Text><Text style={styles.meta}>Schnell erfassen, später abhaken</Text></View></View>
+      <View style={styles.addRow}><TextInput style={styles.input} value={itemName} onChangeText={setItemName} onSubmitEditing={() => void add()} editable={!busy} returnKeyType="done" placeholder="z. B. Milch, Äpfel, Kaffee …" placeholderTextColor={colors.textSoft} /><Pressable disabled={busy || !itemName.trim()} onPress={() => void add()} style={({ pressed }) => [styles.addButton, (busy || !itemName.trim()) && styles.disabled, pressed && styles.pressed]}><Ionicons name="arrow-up" size={22} color="#fff" /></Pressable></View>
+    </View>
+
+    <View style={styles.hint}><Ionicons name="swap-horizontal-outline" size={17} color={colors.textMuted} /><Text style={styles.hintText}>Links wischen: löschen · rechts wischen: erledigen</Text></View>
+
+    {items.length === 0 ? <EmptyState title="Deine Liste ist leer" body="Füge das erste Produkt hinzu. HomeOS speichert alles sofort lokal." icon="cart-outline" /> : <>{group('Offen', 'Noch zu besorgen', openItems)}{group('Erledigt', 'Bereits im Einkaufswagen', doneItems)}</>}
   </Screen>;
 }
 
 const styles = StyleSheet.create({
-  addRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm }, inputWrap: { flex: 1, minHeight: 52, borderRadius: radius.md, backgroundColor: colors.surfaceMuted, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 10 }, input: { flex: 1, fontSize: 16, color: colors.text, paddingVertical: 0 }, addButton: { width: 52, height: 52, borderRadius: radius.md, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' }, disabled: { opacity: 0.4 }, pressed: { opacity: 0.78 }, sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, sectionTitle: { fontSize: 18, fontWeight: '800', color: colors.text }, counter: { minWidth: 28, paddingHorizontal: 9, paddingVertical: 4, borderRadius: radius.pill, backgroundColor: colors.surfaceMuted, textAlign: 'center', fontSize: 12, fontWeight: '800', color: colors.textMuted }, divider: { height: 1, backgroundColor: colors.border }, itemRow: { minHeight: 58, flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 7 }, check: { width: 28, height: 28, borderRadius: 10, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.surfaceRaised, alignItems: 'center', justifyContent: 'center' }, checked: { borderColor: colors.accent, backgroundColor: colors.accent }, itemTextWrap: { flex: 1, gap: 2 }, itemText: { fontSize: 16, fontWeight: '700', color: colors.text }, done: { textDecorationLine: 'line-through', color: colors.textMuted }, meta: { fontSize: 12, color: colors.textMuted }, deleteButton: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  flex: { flex: 1 }, hero: { flexDirection: 'row', alignItems: 'center', gap: spacing.md }, kicker: { fontSize: 11, fontWeight: '800', letterSpacing: 1.2, color: colors.textMuted }, h1: { fontSize: 38, lineHeight: 44, fontWeight: '800', letterSpacing: -1.35, color: colors.text }, sub: { marginTop: 2, fontSize: 15, color: colors.textMuted }, heroIcon: { width: 54, height: 54, borderRadius: 18, backgroundColor: colors.accentSoft, alignItems: 'center', justifyContent: 'center' },
+  progressCard: { borderRadius: radius.lg, backgroundColor: colors.accent, padding: 18, gap: 16 }, progressTop: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' }, progressLabel: { fontSize: 10, fontWeight: '800', letterSpacing: 1.1, color: 'rgba(255,255,255,.62)' }, progressValue: { marginTop: 2, fontSize: 31, lineHeight: 36, fontWeight: '800', color: '#fff' }, progressNumbers: { flexDirection: 'row', alignItems: 'center', gap: 14 }, number: { fontSize: 19, fontWeight: '800', color: '#fff', textAlign: 'center' }, numberLabel: { fontSize: 11, color: 'rgba(255,255,255,.65)' }, divider: { width: 1, height: 34, backgroundColor: 'rgba(255,255,255,.18)' }, track: { height: 7, borderRadius: 999, overflow: 'hidden', backgroundColor: 'rgba(255,255,255,.16)' }, bar: { height: '100%', minWidth: 6, borderRadius: 999, backgroundColor: '#fff' },
+  composer: { padding: 16, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, gap: 14 }, composerHead: { flexDirection: 'row', alignItems: 'center', gap: 11 }, composerIcon: { width: 38, height: 38, borderRadius: 12, backgroundColor: colors.accentSoft, alignItems: 'center', justifyContent: 'center' }, composerTitle: { fontSize: 16, fontWeight: '800', color: colors.text }, addRow: { flexDirection: 'row', gap: 9 }, input: { flex: 1, height: 52, borderRadius: 15, backgroundColor: colors.surfaceMuted, paddingHorizontal: 15, fontSize: 16, color: colors.text }, addButton: { width: 52, height: 52, borderRadius: 15, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' }, disabled: { opacity: .4 }, pressed: { opacity: .78 },
+  hint: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 4 }, hintText: { flex: 1, fontSize: 11, color: colors.textMuted }, group: { gap: 10 }, sectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 3 }, sectionTitle: { fontSize: 20, fontWeight: '800', letterSpacing: -.35, color: colors.text }, badge: { minWidth: 30, height: 30, paddingHorizontal: 9, borderRadius: 15, backgroundColor: colors.surfaceMuted, alignItems: 'center', justifyContent: 'center' }, badgeText: { fontSize: 12, fontWeight: '800', color: colors.textMuted }, rows: { gap: 8 },
+  itemRow: { minHeight: 70, paddingHorizontal: 13, paddingVertical: 11, flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface }, pressedRow: { opacity: .75 }, itemIcon: { width: 42, height: 42, borderRadius: 14, backgroundColor: colors.accentSoft, alignItems: 'center', justifyContent: 'center' }, itemIconDone: { backgroundColor: colors.success }, itemName: { fontSize: 16, fontWeight: '700', color: colors.text }, done: { textDecorationLine: 'line-through', color: colors.textMuted }, meta: { fontSize: 12, lineHeight: 17, color: colors.textMuted },
 });
