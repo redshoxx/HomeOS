@@ -2,7 +2,7 @@
   "expo": {
     "name": "HomeOS",
     "slug": "homeos",
-    "version": "0.1.0",
+    "version": "0.3.0",
     "orientation": "portrait",
     "scheme": "homeos",
     "userInterfaceStyle": "automatic",
@@ -10,11 +10,11 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "at.homeos.mobile",
-      "buildNumber": "1"
+      "buildNumber": "3"
     },
     "android": {
       "package": "at.homeos.mobile",
-      "versionCode": 1,
+      "versionCode": 3,
       "adaptiveIcon": {
         "backgroundColor": "#F4F5F2"
       }
