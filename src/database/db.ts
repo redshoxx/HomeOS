@@ -7,8 +7,8 @@ export function getDb(): Promise<SQLite.SQLiteDatabase> {
   return dbPromise;
 }
 
+const pragmas = `PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;`;
 const migrations = [
-  `PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;`,
   `CREATE TABLE IF NOT EXISTS schema_meta (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL);`,
   `CREATE TABLE IF NOT EXISTS households (id TEXT PRIMARY KEY NOT NULL, name TEXT NOT NULL, currency TEXT NOT NULL DEFAULT 'EUR', created_at TEXT NOT NULL, updated_at TEXT NOT NULL);`,
   `CREATE TABLE IF NOT EXISTS household_members (id TEXT PRIMARY KEY NOT NULL, household_id TEXT NOT NULL REFERENCES households(id) ON DELETE CASCADE, user_id TEXT, display_name TEXT NOT NULL, role TEXT NOT NULL DEFAULT 'member', joined_at TEXT NOT NULL);`,
@@ -32,6 +32,7 @@ const migrations = [
 
 export async function migrateDatabase(): Promise<void> {
   const db = await getDb();
+  await db.execAsync(pragmas);
   await db.withTransactionAsync(async () => {
     for (const sql of migrations) await db.execAsync(sql);
     await db.runAsync(`INSERT OR REPLACE INTO schema_meta(key,value) VALUES('version','1')`);
