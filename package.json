@@ -1,9 +1,13 @@
 {
   "name": "homeos",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
+    "prepare:assets": "node scripts/prepare-assets.js",
+    "prestart": "npm run prepare:assets",
+    "preandroid": "npm run prepare:assets",
+    "preios": "npm run prepare:assets",
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
