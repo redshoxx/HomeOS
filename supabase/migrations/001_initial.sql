@@ -1,4 +1,4 @@
--- HomeOS initial cloud schema. Run in a fresh Supabase project.
+-- HomeOS initial cloud schema. Safe to run repeatedly.
 create extension if not exists pgcrypto;
 
 create table if not exists public.households (
@@ -52,6 +52,19 @@ alter table public.tasks enable row level security;
 alter table public.transactions enable row level security;
 alter table public.bills enable row level security;
 alter table public.devices enable row level security;
+
+drop policy if exists households_member_select on public.households;
+drop policy if exists households_owner_insert on public.households;
+drop policy if exists members_visible_to_members on public.household_members;
+drop policy if exists members_owner_insert on public.household_members;
+drop policy if exists members_owner_update on public.household_members;
+drop policy if exists lists_member_all on public.shopping_lists;
+drop policy if exists items_member_all on public.shopping_items;
+drop policy if exists pantry_member_all on public.pantry_items;
+drop policy if exists tasks_member_all on public.tasks;
+drop policy if exists tx_member_all on public.transactions;
+drop policy if exists bills_member_all on public.bills;
+drop policy if exists devices_member_all on public.devices;
 
 create policy households_member_select on public.households for select using (public.is_household_member(id) or owner_id=auth.uid());
 create policy households_owner_insert on public.households for insert with check (owner_id=auth.uid());
