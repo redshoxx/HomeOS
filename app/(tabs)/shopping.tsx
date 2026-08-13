@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Screen } from '@/components/Screen';
 import { Heading } from '@/components/Heading';
 import { Card } from '@/components/Card';
 import { EmptyState } from '@/components/EmptyState';
-import { addShoppingItem, getDefaultList, listItems, toggleShoppingItem } from '@/repositories/shoppingRepo';
+import { addShoppingItem, deleteShoppingItem, getDefaultList, listItems, toggleShoppingItem } from '@/repositories/shoppingRepo';
 import type { ShoppingItem } from '@/types/models';
 import { useAppStore } from '@/store/appStore';
 import { colors, radius, spacing } from '@/theme/theme';
@@ -32,6 +32,11 @@ export default function Shopping() {
     bump();
   };
 
+  const remove = (item: ShoppingItem) => Alert.alert(item.name, 'Produkt löschen?', [
+    { text: 'Abbrechen' },
+    { text: 'Löschen', style: 'destructive', onPress: async () => { await deleteShoppingItem(item.id); await load(); bump(); } },
+  ]);
+
   return <Screen>
     <Heading title="Einkauf" subtitle={`${items.filter((item) => !item.checked).length} offen · ${items.filter((item) => item.checked).length} erledigt`} />
     <Card><View style={styles.row}>
@@ -39,7 +44,7 @@ export default function Shopping() {
       <Pressable style={styles.add} onPress={add}><Text style={styles.addText}>+</Text></Pressable>
     </View></Card>
     {items.length === 0 ? <EmptyState title="Noch keine Produkte" body="Füge dein erstes Produkt hinzu. Es wird sofort lokal gespeichert." /> : items.map((item) =>
-      <Pressable key={item.id} onPress={async () => { await toggleShoppingItem(item.id, !item.checked); await load(); bump(); }}>
+      <Pressable key={item.id} onLongPress={() => remove(item)} onPress={async () => { await toggleShoppingItem(item.id, !item.checked); await load(); bump(); }}>
         <Card><View style={styles.itemRow}>
           <View style={[styles.check, item.checked === 1 && styles.checked]}><Text style={styles.checkText}>{item.checked ? '✓' : ''}</Text></View>
           <Text style={[styles.itemText, item.checked === 1 && styles.done]}>{item.name}</Text>
