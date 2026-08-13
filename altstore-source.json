@@ -1,0 +1,34 @@
+{
+  "name": "HomeOS",
+  "subtitle": "Private Haushalts-App für iPhone",
+  "description": "HomeOS bündelt Einkauf, Vorräte, Aufgaben, Finanzen, Rechnungen und Geräte in einer Offline-First-App.",
+  "iconURL": "https://raw.githubusercontent.com/redshoxx/HomeOS/main/assets/icon.png",
+  "tintColor": "163C2A",
+  "apps": [
+    {
+      "name": "HomeOS",
+      "bundleIdentifier": "at.homeos.mobile",
+      "developerName": "redshoxx",
+      "subtitle": "Dein Haushalt an einem Ort",
+      "localizedDescription": "Offline-First Haushalts-App mit optionalem Supabase-Sync.",
+      "iconURL": "https://raw.githubusercontent.com/redshoxx/HomeOS/main/assets/icon.png",
+      "tintColor": "163C2A",
+      "category": "utilities",
+      "versions": [
+        {
+          "version": "0.3.0",
+          "buildVersion": "1",
+          "date": "2026-08-13",
+          "localizedDescription": "Neues Design, stabilerer Start, verbesserter Sync und AltStore-Update-Kanal.",
+          "downloadURL": "https://github.com/redshoxx/HomeOS/releases/latest/download/HomeOS.ipa",
+          "size": 0,
+          "minOSVersion": "16.0"
+        }
+      ],
+      "appPermissions": {
+        "entitlements": [],
+        "privacy": {}
+      }
+    }
+  ]
+}
