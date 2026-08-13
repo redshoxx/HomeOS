@@ -9,7 +9,12 @@ export function Screen({ children, scroll = true }: Props) {
     <SafeAreaView style={styles.safe}>
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         {scroll ? (
-          <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+          <ScrollView
+            contentInsetAdjustmentBehavior="automatic"
+            contentContainerStyle={styles.content}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
             {children}
           </ScrollView>
         ) : (
@@ -23,5 +28,11 @@ export function Screen({ children, scroll = true }: Props) {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   flex: { flex: 1 },
-  content: { flexGrow: 1, paddingHorizontal: spacing.md, paddingTop: spacing.md, paddingBottom: 110, gap: spacing.md },
+  content: {
+    flexGrow: 1,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    paddingBottom: 118,
+    gap: spacing.md,
+  },
 });
