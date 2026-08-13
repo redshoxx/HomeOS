@@ -1,0 +1,102 @@
+name: HomeOS Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  android:
+    name: Android APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Repository laden
+        uses: actions/checkout@v6
+
+      - name: Node.js installieren
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Java installieren
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Abhängigkeiten installieren
+        run: npm install
+
+      - name: Android-Projekt erzeugen
+        run: npx expo prebuild --platform android --non-interactive
+
+      - name: APK bauen
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease
+
+      - name: APK umbenennen
+        run: |
+          cp android/app/build/outputs/apk/release/app-release.apk HomeOS.apk
+
+      - name: APK hochladen
+        uses: actions/upload-artifact@v4
+        with:
+          name: HomeOS-Android-APK
+          path: HomeOS.apk
+          retention-days: 30
+
+  ios:
+    name: iOS IPA für Sideloadly
+    runs-on: macos-26
+
+    steps:
+      - name: Repository laden
+        uses: actions/checkout@v6
+
+      - name: Node.js installieren
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Abhängigkeiten installieren
+        run: npm install
+
+      - name: iOS-Projekt erzeugen
+        run: npx expo prebuild --platform ios --non-interactive
+
+      - name: iOS Release App bauen
+        run: |
+          npx expo run:ios \
+            --configuration Release \
+            --device generic \
+            --output ./build
+
+      - name: IPA erstellen
+        run: |
+          APP_PATH=$(find ./build -name "*.app" -type d | head -1)
+
+          if [ -z "$APP_PATH" ]; then
+            echo "Keine .app-Datei gefunden."
+            exit 1
+          fi
+
+          echo "Gefundene App: $APP_PATH"
+
+          mkdir -p Payload
+          cp -R "$APP_PATH" Payload/HomeOS.app
+
+          zip -qry HomeOS-Sideloadly.ipa Payload
+
+      - name: IPA hochladen
+        uses: actions/upload-artifact@v4
+        with:
+          name: HomeOS-iOS-Sideloadly-IPA
+          path: HomeOS-Sideloadly.ipa
+          retention-days: 30
