@@ -62,10 +62,7 @@ export async function flushSyncQueue(): Promise<SyncResult> {
         }
 
         if (!error && row.entity_type === 'households' && row.operation === 'CREATE') {
-          const member = await supabase.from('household_members').upsert(
-            { household_id: row.entity_id, user_id: session.user.id, role: 'owner' },
-            { onConflict: 'household_id,user_id' },
-          );
+          const member = await supabase.rpc('ensure_household_owner_member', { target: row.entity_id });
           error = member.error;
         }
       }
