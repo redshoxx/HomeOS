@@ -17,6 +17,7 @@ concurrency:
 env:
   EXPO_PUBLIC_SUPABASE_URL: ${{ vars.EXPO_PUBLIC_SUPABASE_URL }}
   EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+  CI: 1
 
 jobs:
   quality:
@@ -57,7 +58,7 @@ jobs:
           app.expo.android.versionCode = build;
           fs.writeFileSync('app.json', JSON.stringify(app, null, 2) + '\n');
           NODE
-      - run: npx expo prebuild --platform android --non-interactive
+      - run: npx expo prebuild --platform android
       - run: cd android && chmod +x gradlew && ./gradlew assembleRelease
       - run: cp android/app/build/outputs/apk/release/app-release.apk HomeOS.apk
       - uses: actions/upload-artifact@v4
@@ -87,7 +88,7 @@ jobs:
           app.expo.android.versionCode = build;
           fs.writeFileSync('app.json', JSON.stringify(app, null, 2) + '\n');
           NODE
-      - run: npx expo prebuild --platform ios --non-interactive
+      - run: npx expo prebuild --platform ios
       - run: cd ios && pod install
       - name: Build physical iPhone app
         shell: bash
@@ -128,14 +129,25 @@ jobs:
           name: HomeOS-iOS-IPA
           path: release
       - name: Prepare release metadata
+        shell: bash
         run: |
+          set -euo pipefail
           node scripts/prepare-assets.js
           cp assets/icon.png release/HomeOS-icon.png
-          echo "VERSION=$(node -p \"require('./package.json').version\")" >> "$GITHUB_ENV"
-          echo "BUILD_VERSION=$GITHUB_RUN_NUMBER" >> "$GITHUB_ENV"
-          echo "RELEASE_TAG=build-$GITHUB_RUN_NUMBER" >> "$GITHUB_ENV"
-          echo "IPA_SIZE=$(stat -c%s release/HomeOS.ipa)" >> "$GITHUB_ENV"
-          echo "IPA_SHA256=$(sha256sum release/HomeOS.ipa | cut -d' ' -f1)" >> "$GITHUB_ENV"
+
+          VERSION="$(python3 -c 'import json; print(json.load(open("package.json"))["version"])')"
+          BUILD_VERSION="$GITHUB_RUN_NUMBER"
+          RELEASE_TAG="build-$GITHUB_RUN_NUMBER"
+          IPA_SIZE="$(stat -c%s release/HomeOS.ipa)"
+          IPA_SHA256="$(sha256sum release/HomeOS.ipa | awk '{print $1}')"
+
+          {
+            printf 'VERSION=%s\n' "$VERSION"
+            printf 'BUILD_VERSION=%s\n' "$BUILD_VERSION"
+            printf 'RELEASE_TAG=%s\n' "$RELEASE_TAG"
+            printf 'IPA_SIZE=%s\n' "$IPA_SIZE"
+            printf 'IPA_SHA256=%s\n' "$IPA_SHA256"
+          } >> "$GITHUB_ENV"
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
