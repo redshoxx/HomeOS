@@ -10,10 +10,19 @@
       "developerName": "redshoxx",
       "subtitle": "Dein Haushalt. Einfach organisiert.",
       "localizedDescription": "HomeOS organisiert Einkauf, Vorräte, Aufgaben, Finanzen, Rechnungen und Geräte offline-first mit optionalem Cloud-Sync.",
-      "iconURL": "https://github.com/redshoxx/HomeOS/releases/download/build-22/HomeOS-icon.png",
+      "iconURL": "https://github.com/redshoxx/HomeOS/releases/download/build-23/HomeOS-icon.png",
       "tintColor": "#163C2A",
       "category": "utilities",
       "versions": [
+        {
+          "version": "0.4.0",
+          "buildVersion": "23",
+          "date": "2026-08-14",
+          "localizedDescription": "Neues HomeOS Design, Stabilitätsverbesserungen, Cloud-Sync und AltStore-Update-Kanal.",
+          "downloadURL": "https://github.com/redshoxx/HomeOS/releases/download/build-23/HomeOS.ipa",
+          "size": 14539876,
+          "sha256": "ec1fd252157b798458d492a071684cdfe227f2e27cdf25bd67234fa80c87d651"
+        },
         {
           "version": "0.4.0",
           "buildVersion": "22",
