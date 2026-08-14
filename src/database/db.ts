@@ -24,9 +24,12 @@ const migrations = [
   `CREATE TABLE IF NOT EXISTS sync_queue (id TEXT PRIMARY KEY NOT NULL, entity_type TEXT NOT NULL, entity_id TEXT NOT NULL, operation TEXT NOT NULL CHECK(operation IN ('CREATE','UPDATE','DELETE')), payload TEXT, created_at TEXT NOT NULL, retry_count INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'pending', last_error TEXT);`,
   `CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL);`,
   `CREATE INDEX IF NOT EXISTS idx_shopping_lists_household ON shopping_lists(household_id);`,
+  `CREATE INDEX IF NOT EXISTS idx_shopping_items_list_checked ON shopping_items(list_id, checked, created_at);`,
   `CREATE INDEX IF NOT EXISTS idx_pantry_household ON pantry_items(household_id);`,
   `CREATE INDEX IF NOT EXISTS idx_tasks_household ON tasks(household_id, completed, due_date);`,
   `CREATE INDEX IF NOT EXISTS idx_transactions_household_date ON transactions(household_id, date);`,
+  `CREATE INDEX IF NOT EXISTS idx_bills_household_status_due ON bills(household_id, status, due_date);`,
+  `CREATE INDEX IF NOT EXISTS idx_devices_household ON devices(household_id, name);`,
   `CREATE INDEX IF NOT EXISTS idx_sync_queue_status ON sync_queue(status, created_at);`,
 ];
 
@@ -35,7 +38,7 @@ export async function migrateDatabase(): Promise<void> {
   await db.execAsync(pragmas);
   await db.withTransactionAsync(async () => {
     for (const sql of migrations) await db.execAsync(sql);
-    await db.runAsync(`INSERT OR REPLACE INTO schema_meta(key,value) VALUES('version','1')`);
+    await db.runAsync(`INSERT OR REPLACE INTO schema_meta(key,value) VALUES('version','2')`);
   });
 }
 

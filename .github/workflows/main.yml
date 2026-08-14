@@ -5,6 +5,9 @@ on:
     branches: [main]
     paths-ignore:
       - altstore-source.json
+      - package-lock.json
+      - README.md
+      - "docs/**"
   workflow_dispatch:
 
 permissions:
@@ -18,35 +21,63 @@ env:
   EXPO_PUBLIC_SUPABASE_URL: ${{ vars.EXPO_PUBLIC_SUPABASE_URL }}
   EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
   CI: 1
+  NPM_CONFIG_AUDIT: "false"
+  NPM_CONFIG_FUND: "false"
 
 jobs:
   quality:
     name: Typecheck & Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
         with:
           node-version: 24
-      - run: npm install
+      - uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('package-lock.json', 'package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-
+      - name: Install dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci --prefer-offline --no-audit --no-fund
+          else
+            npm install --prefer-offline --no-audit --no-fund
+          fi
       - run: npm run prepare:assets
       - run: npm run typecheck
       - run: npm test
+      - uses: actions/upload-artifact@v4
+        with:
+          name: HomeOS-package-lock
+          path: package-lock.json
+          retention-days: 2
 
   android:
     name: Android APK
-    needs: quality
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
         with:
           node-version: 24
-      - uses: actions/setup-java@v5
+      - uses: actions/cache@v4
         with:
-          distribution: temurin
-          java-version: 17
-      - run: npm install
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('package-lock.json', 'package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-
+      - name: Install dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci --prefer-offline --no-audit --no-fund
+          else
+            npm install --prefer-offline --no-audit --no-fund
+          fi
       - run: npm run prepare:assets
       - name: Set native build number
         run: |
@@ -58,25 +89,43 @@ jobs:
           app.expo.android.versionCode = build;
           fs.writeFileSync('app.json', JSON.stringify(app, null, 2) + '\n');
           NODE
-      - run: npx expo prebuild --platform android
-      - run: cd android && chmod +x gradlew && ./gradlew assembleRelease
+      - run: npx expo prebuild --platform android --no-install
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: gradle
+      - run: cd android && chmod +x gradlew && ./gradlew assembleRelease --build-cache --parallel --daemon
       - run: cp android/app/build/outputs/apk/release/app-release.apk HomeOS.apk
       - uses: actions/upload-artifact@v4
         with:
           name: HomeOS-Android-APK
           path: HomeOS.apk
-          retention-days: 30
+          retention-days: 14
+          compression-level: 0
 
   ios:
     name: iOS IPA for AltStore
-    needs: quality
     runs-on: macos-26
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
         with:
           node-version: 24
-      - run: npm install
+      - uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('package-lock.json', 'package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-
+      - name: Install dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci --prefer-offline --no-audit --no-fund
+          else
+            npm install --prefer-offline --no-audit --no-fund
+          fi
       - run: npm run prepare:assets
       - name: Set native build number
         run: |
@@ -88,7 +137,16 @@ jobs:
           app.expo.android.versionCode = build;
           fs.writeFileSync('app.json', JSON.stringify(app, null, 2) + '\n');
           NODE
-      - run: npx expo prebuild --platform ios
+      - run: npx expo prebuild --platform ios --no-install
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ios/Pods
+            ~/Library/Caches/CocoaPods
+            ~/.cocoapods
+          key: ${{ runner.os }}-pods-${{ hashFiles('package-lock.json', 'package.json', 'app.json') }}
+          restore-keys: |
+            ${{ runner.os }}-pods-
       - run: cd ios && pod install
       - name: Build physical iPhone app
         shell: bash
@@ -97,7 +155,19 @@ jobs:
           SCHEME=$(find ios -path "*/xcshareddata/xcschemes/*.xcscheme" -not -path "*/Pods/*" | head -1 | sed 's#.*/##; s#\.xcscheme$##')
           test -n "$WORKSPACE"
           test -n "$SCHEME"
-          xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -configuration Release -sdk iphoneos -destination "generic/platform=iOS" -derivedDataPath "$PWD/ios/build" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build
+          xcodebuild \
+            -workspace "$WORKSPACE" \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination "generic/platform=iOS" \
+            -derivedDataPath "$PWD/ios/build" \
+            -parallelizeTargets \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            build
       - name: Create IPA
         run: |
           APP_PATH=$(find ios/build/Build/Products/Release-iphoneos -maxdepth 1 -name "*.app" -type d | head -1)
@@ -110,12 +180,14 @@ jobs:
         with:
           name: HomeOS-iOS-IPA
           path: HomeOS.ipa
-          retention-days: 30
+          retention-days: 14
+          compression-level: 0
 
   publish:
     name: Publish AltStore update
-    needs: [android, ios]
+    needs: [quality, android, ios]
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
         with:
@@ -128,10 +200,15 @@ jobs:
         with:
           name: HomeOS-iOS-IPA
           path: release
+      - uses: actions/download-artifact@v4
+        with:
+          name: HomeOS-package-lock
+          path: release-lock
       - name: Prepare release metadata
         shell: bash
         run: |
           set -euo pipefail
+          cp release-lock/package-lock.json package-lock.json
           node scripts/prepare-assets.js
           cp assets/icon.png release/HomeOS-icon.png
 
@@ -152,7 +229,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$RELEASE_TAG" release/HomeOS.ipa release/HomeOS.apk release/HomeOS-icon.png --title "HomeOS $VERSION ($BUILD_VERSION)" --notes "HomeOS $VERSION build $BUILD_VERSION: redesigned interface, stability fixes, cloud sync improvements and AltStore update support." --latest
+          gh release create "$RELEASE_TAG" release/HomeOS.ipa release/HomeOS.apk release/HomeOS-icon.png \
+            --title "HomeOS $VERSION ($BUILD_VERSION)" \
+            --notes "HomeOS $VERSION: komplett vereinfachte Oberfläche, zentraler Schnell-Hinzufügen-Flow, schnellere Listen und optimierte Build-Pipeline." \
+            --latest
       - name: Update AltStore source
         run: |
           python3 - <<'PY'
@@ -177,7 +257,7 @@ jobs:
               'version': version,
               'buildVersion': build,
               'date': datetime.now(timezone.utc).date().isoformat(),
-              'localizedDescription': 'Neues HomeOS Design, Stabilitätsverbesserungen, Cloud-Sync und AltStore-Update-Kanal.',
+              'localizedDescription': 'Neue vereinfachte HomeOS Oberfläche, schnelleres Hinzufügen, optimierte Performance und stabilere Abläufe.',
               'downloadURL': f'{base}/HomeOS.ipa',
               'size': size,
               'sha256': sha,
@@ -193,7 +273,7 @@ jobs:
                   'bundleIdentifier': 'at.homeos.mobile',
                   'developerName': 'redshoxx',
                   'subtitle': 'Dein Haushalt. Einfach organisiert.',
-                  'localizedDescription': 'HomeOS organisiert Einkauf, Vorräte, Aufgaben, Finanzen, Rechnungen und Geräte offline-first mit optionalem Cloud-Sync.',
+                  'localizedDescription': 'HomeOS bündelt Einkauf, Aufgaben, Vorräte, Finanzen, Rechnungen und Geräte in einer einfachen Oberfläche.',
                   'iconURL': f'{base}/HomeOS-icon.png',
                   'tintColor': '#163C2A',
                   'category': 'utilities',
@@ -208,6 +288,6 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add altstore-source.json
+          git add altstore-source.json package-lock.json
           git commit -m "chore: publish AltStore build $BUILD_VERSION [skip ci]" || exit 0
           git push origin HEAD:main

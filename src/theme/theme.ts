@@ -1,15 +1,15 @@
 export const colors = {
-  background: '#F5F7F3',
+  background: '#F4F5F1',
   surface: '#FFFFFF',
-  surfaceMuted: '#EEF2EC',
+  surfaceMuted: '#EFF1EC',
   surfaceRaised: '#FAFBF9',
-  text: '#101712',
-  textMuted: '#6B756D',
-  textSoft: '#929A94',
-  border: '#E1E7E0',
-  accent: '#163C2A',
-  accentPressed: '#0F2E20',
-  accentSoft: '#E1EEE6',
+  text: '#0D1510',
+  textMuted: '#687168',
+  textSoft: '#939B94',
+  border: '#E0E5DE',
+  accent: '#123E2A',
+  accentPressed: '#0B2D1D',
+  accentSoft: '#E2EEE6',
   accentText: '#FFFFFF',
   danger: '#B42318',
   dangerSoft: '#FDEAE8',
@@ -20,10 +20,10 @@ export const colors = {
 } as const;
 
 export const spacing = { xs: 6, sm: 10, md: 16, lg: 22, xl: 30, xxl: 40 } as const;
-export const radius = { sm: 12, md: 18, lg: 26, xl: 32, pill: 999 } as const;
+export const radius = { sm: 11, md: 16, lg: 22, xl: 28, pill: 999 } as const;
 export const typography = {
-  title: { fontSize: 34, lineHeight: 40, fontWeight: '800' as const, letterSpacing: -1.1 },
-  h2: { fontSize: 21, lineHeight: 27, fontWeight: '700' as const, letterSpacing: -0.35 },
+  title: { fontSize: 32, lineHeight: 38, fontWeight: '800' as const, letterSpacing: -1 },
+  h2: { fontSize: 20, lineHeight: 26, fontWeight: '700' as const, letterSpacing: -0.3 },
   body: { fontSize: 16, lineHeight: 23 },
   meta: { fontSize: 13, lineHeight: 18 },
 } as const;

@@ -3,12 +3,13 @@ import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { Screen } from '@/components/Screen';
+import { AppHeader } from '@/components/AppHeader';
 import { EmptyState } from '@/components/EmptyState';
 import { SwipeActionRow } from '@/components/SwipeActionRow';
 import { deleteShoppingItem, getDefaultList, listItems, toggleShoppingItem } from '@/repositories/shoppingRepo';
 import type { ShoppingItem } from '@/types/models';
 import { useAppStore } from '@/store/appStore';
-import { colors, radius, spacing } from '@/theme/theme';
+import { colors, radius } from '@/theme/theme';
 
 const messageOf = (error: unknown) => error instanceof Error ? error.message : 'Unbekannter Fehler';
 
@@ -17,6 +18,7 @@ export default function Shopping() {
   const revision = useAppStore(s => s.revision);
   const bump = useAppStore(s => s.bump);
   const [items, setItems] = useState<ShoppingItem[]>([]);
+  const [showDone, setShowDone] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
@@ -25,7 +27,9 @@ export default function Shopping() {
     setItems(list ? await listItems(list.id) : []);
   }, [householdId]);
 
-  useEffect(() => { void load().catch(error => Alert.alert('Einkauf', messageOf(error))); }, [load, revision]);
+  useEffect(() => {
+    void load().catch(error => Alert.alert('Einkauf', messageOf(error)));
+  }, [load, revision]);
 
   const openItems = useMemo(() => items.filter(item => item.checked !== 1), [items]);
   const doneItems = useMemo(() => items.filter(item => item.checked === 1), [items]);
@@ -33,57 +37,105 @@ export default function Shopping() {
   const toggle = async (item: ShoppingItem) => {
     if (busy) return;
     setBusy(true);
-    try { await toggleShoppingItem(item.id, item.checked !== 1); await load(); bump(); }
-    catch (error) { Alert.alert('Änderung fehlgeschlagen', messageOf(error)); }
-    finally { setBusy(false); }
+    try {
+      await toggleShoppingItem(item.id, item.checked !== 1);
+      await load();
+      bump();
+    } catch (error) {
+      Alert.alert('Änderung fehlgeschlagen', messageOf(error));
+    } finally {
+      setBusy(false);
+    }
   };
 
   const remove = async (item: ShoppingItem) => {
     if (busy) return;
     setBusy(true);
-    try { await deleteShoppingItem(item.id); await load(); bump(); }
-    catch (error) { Alert.alert('Löschen fehlgeschlagen', messageOf(error)); }
-    finally { setBusy(false); }
+    try {
+      await deleteShoppingItem(item.id);
+      await load();
+      bump();
+    } catch (error) {
+      Alert.alert('Löschen fehlgeschlagen', messageOf(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const row = (item: ShoppingItem) => {
+    const checked = item.checked === 1;
+    return (
+      <SwipeActionRow
+        key={item.id}
+        disabled={busy}
+        onDelete={() => void remove(item)}
+        onPrimaryAction={() => void toggle(item)}
+        primaryLabel={checked ? 'Zurück' : 'Erledigt'}
+        primaryIcon={checked ? 'arrow-undo-outline' : 'checkmark-circle-outline'}
+      >
+        <Pressable onPress={() => void toggle(item)} style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
+          <View style={[styles.check, checked && styles.checkDone]}>
+            {checked ? <Ionicons name="checkmark" size={17} color="#fff" /> : null}
+          </View>
+          <View style={styles.flex}>
+            <Text style={[styles.name, checked && styles.done]} numberOfLines={2}>{item.name}</Text>
+            {(item.quantity !== 1 || item.unit || item.category) ? (
+              <Text style={styles.meta}>{item.quantity} {item.unit ?? 'Stk.'}{item.category ? ` · ${item.category}` : ''}</Text>
+            ) : null}
+          </View>
+        </Pressable>
+      </SwipeActionRow>
+    );
   };
 
   if (!householdId) return <Screen><EmptyState title="Kein Haushalt aktiv" body="Richte zuerst deinen Haushalt ein." icon="home-outline" /></Screen>;
 
-  const row = (item: ShoppingItem) => {
-    const checked = item.checked === 1;
-    return <SwipeActionRow key={item.id} disabled={busy} onDelete={() => void remove(item)} onPrimaryAction={() => void toggle(item)} primaryLabel={checked ? 'Zurück' : 'Erledigt'} primaryIcon={checked ? 'arrow-undo-outline' : 'checkmark-circle-outline'}>
-      <Pressable onPress={() => void toggle(item)} style={({ pressed }) => [styles.itemRow, pressed && styles.pressedRow]}>
-        <View style={[styles.itemIcon, checked && styles.itemIconDone]}><Ionicons name={checked ? 'checkmark' : 'basket-outline'} size={20} color={checked ? '#fff' : colors.accent} /></View>
-        <View style={styles.flex}><Text style={[styles.itemName, checked && styles.done]} numberOfLines={1}>{item.name}</Text><Text style={styles.meta}>{item.quantity} {item.unit ?? 'Stk.'}{item.category ? ` · ${item.category}` : ''}</Text></View>
-        <Ionicons name="chevron-back-outline" size={17} color={colors.textSoft} />
+  return (
+    <Screen>
+      <AppHeader eyebrow="EINKAUF" title="Deine Liste" subtitle={openItems.length ? `${openItems.length} noch zu besorgen` : 'Alles erledigt'} />
+
+      <Pressable onPress={() => router.push({ pathname: '/(tabs)/add', params: { type: 'shopping' } })} style={({ pressed }) => [styles.addShortcut, pressed && styles.pressed]}>
+        <View style={styles.addIcon}><Ionicons name="add" size={22} color="#fff" /></View>
+        <View style={styles.flex}><Text style={styles.addTitle}>Produkt hinzufügen</Text><Text style={styles.meta}>Ein Tippen auf + genügt</Text></View>
+        <Ionicons name="chevron-forward" size={18} color={colors.textSoft} />
       </Pressable>
-    </SwipeActionRow>;
-  };
 
-  const group = (title: string, subtitle: string, data: ShoppingItem[]) => data.length ? <View style={styles.group}>
-    <View style={styles.sectionHead}><View><Text style={styles.sectionTitle}>{title}</Text><Text style={styles.meta}>{subtitle}</Text></View><View style={styles.badge}><Text style={styles.badgeText}>{data.length}</Text></View></View>
-    <View style={styles.rows}>{data.map(row)}</View>
-  </View> : null;
+      {openItems.length ? (
+        <View style={styles.list}>{openItems.map(row)}</View>
+      ) : (
+        <EmptyState title="Nichts mehr offen" body="Beim nächsten Einkauf einfach wieder über + ergänzen." icon="checkmark-circle-outline" />
+      )}
 
-  return <Screen>
-    <View style={styles.hero}>
-      <View style={styles.flex}><Text style={styles.kicker}>EINKAUFSLISTE</Text><Text style={styles.h1}>Einkauf</Text><Text style={styles.sub}>{openItems.length} noch zu besorgen</Text></View>
-      <Pressable onPress={() => router.push('/settings')} style={({ pressed }) => [styles.heroIcon, pressed && styles.pressed]}><Ionicons name="settings-outline" size={24} color={colors.accent} /></Pressable>
-    </View>
+      {doneItems.length ? (
+        <View style={styles.doneBlock}>
+          <Pressable onPress={() => setShowDone(value => !value)} style={({ pressed }) => [styles.doneToggle, pressed && styles.pressed]}>
+            <View><Text style={styles.doneTitle}>Erledigt</Text><Text style={styles.meta}>{doneItems.length} abgehakt</Text></View>
+            <Ionicons name={showDone ? 'chevron-up' : 'chevron-down'} size={19} color={colors.textMuted} />
+          </Pressable>
+          {showDone ? <View style={styles.list}>{doneItems.map(row)}</View> : null}
+        </View>
+      ) : null}
 
-    <View style={styles.quickInfo}>
-      <View style={styles.quickIcon}><Ionicons name="add" size={19} color={colors.accent} /></View>
-      <View style={styles.flex}><Text style={styles.quickTitle}>Produkt hinzufügen</Text><Text style={styles.meta}>Über das Plus unten in der Navigation.</Text></View>
-    </View>
-
-    <View style={styles.hint}><Ionicons name="swap-horizontal-outline" size={17} color={colors.textMuted} /><Text style={styles.hintText}>Links wischen: löschen · rechts wischen: erledigen</Text></View>
-
-    {items.length === 0 ? <EmptyState title="Deine Liste ist leer" body="Tippe unten auf + und füge das erste Produkt hinzu." icon="cart-outline" /> : <>{group('Offen', 'Noch zu besorgen', openItems)}{group('Erledigt', 'Bereits abgehakt', doneItems)}</>}
-  </Screen>;
+      <Text style={styles.hint}>Wischen: links löschen · rechts erledigen</Text>
+    </Screen>
+  );
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1 }, hero: { flexDirection: 'row', alignItems: 'center', gap: spacing.md }, kicker: { fontSize: 11, fontWeight: '800', letterSpacing: 1.2, color: colors.textMuted }, h1: { fontSize: 38, lineHeight: 44, fontWeight: '800', letterSpacing: -1.35, color: colors.text }, sub: { marginTop: 2, fontSize: 15, color: colors.textMuted }, heroIcon: { width: 50, height: 50, borderRadius: 17, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
-  quickInfo: { flexDirection: 'row', alignItems: 'center', gap: 11, padding: 14, borderRadius: radius.md, backgroundColor: colors.surfaceMuted }, quickIcon: { width: 38, height: 38, borderRadius: 12, backgroundColor: colors.accentSoft, alignItems: 'center', justifyContent: 'center' }, quickTitle: { fontSize: 15, fontWeight: '800', color: colors.text },
-  pressed: { opacity: .75 }, hint: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 4 }, hintText: { flex: 1, fontSize: 11, color: colors.textMuted }, group: { gap: 10 }, sectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 3 }, sectionTitle: { fontSize: 20, fontWeight: '800', letterSpacing: -.35, color: colors.text }, badge: { minWidth: 30, height: 30, paddingHorizontal: 9, borderRadius: 15, backgroundColor: colors.surfaceMuted, alignItems: 'center', justifyContent: 'center' }, badgeText: { fontSize: 12, fontWeight: '800', color: colors.textMuted }, rows: { gap: 8 },
-  itemRow: { minHeight: 70, paddingHorizontal: 13, paddingVertical: 11, flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface }, pressedRow: { opacity: .75 }, itemIcon: { width: 42, height: 42, borderRadius: 14, backgroundColor: colors.accentSoft, alignItems: 'center', justifyContent: 'center' }, itemIconDone: { backgroundColor: colors.success }, itemName: { fontSize: 16, fontWeight: '700', color: colors.text }, done: { textDecorationLine: 'line-through', color: colors.textMuted }, meta: { fontSize: 12, lineHeight: 17, color: colors.textMuted },
+  flex: { flex: 1 },
+  pressed: { opacity: 0.7 },
+  addShortcut: { minHeight: 68, padding: 11, borderRadius: radius.md, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, flexDirection: 'row', alignItems: 'center', gap: 11 },
+  addIcon: { width: 42, height: 42, borderRadius: 14, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
+  addTitle: { fontSize: 15, fontWeight: '800', color: colors.text },
+  list: { gap: 7 },
+  row: { minHeight: 62, paddingHorizontal: 13, paddingVertical: 10, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, flexDirection: 'row', alignItems: 'center', gap: 11 },
+  check: { width: 29, height: 29, borderRadius: 10, borderWidth: 2, borderColor: colors.border, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
+  checkDone: { borderColor: colors.success, backgroundColor: colors.success },
+  name: { fontSize: 15, lineHeight: 20, fontWeight: '700', color: colors.text },
+  done: { color: colors.textMuted, textDecorationLine: 'line-through' },
+  meta: { marginTop: 2, fontSize: 11, lineHeight: 16, color: colors.textMuted },
+  doneBlock: { gap: 8 },
+  doneToggle: { minHeight: 56, paddingHorizontal: 13, borderRadius: radius.md, backgroundColor: colors.surfaceMuted, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  doneTitle: { fontSize: 14, fontWeight: '800', color: colors.text },
+  hint: { textAlign: 'center', fontSize: 10, color: colors.textSoft },
 });
