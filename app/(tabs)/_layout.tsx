@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
-import { Platform } from 'react-native';
+import { Platform, View } from 'react-native';
 import { colors } from '@/theme/theme';
 
 const icons = {
@@ -20,7 +20,7 @@ export default function TabsLayout() {
         tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: '#8A938C',
         tabBarStyle: {
-          height: Platform.OS === 'ios' ? 84 : 70,
+          height: Platform.OS === 'ios' ? 88 : 74,
           paddingTop: 9,
           paddingBottom: Platform.OS === 'ios' ? 22 : 9,
           borderTopWidth: 1,
@@ -29,6 +29,13 @@ export default function TabsLayout() {
         },
         tabBarLabelStyle: { fontSize: 11, fontWeight: '700', marginTop: 2 },
         tabBarIcon: ({ color, size, focused }) => {
+          if (route.name === 'add') {
+            return (
+              <View style={{ width: 56, height: 56, marginTop: -22, borderRadius: 28, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center', borderWidth: 4, borderColor: '#fff' }}>
+                <Ionicons name="add" size={31} color="#fff" />
+              </View>
+            );
+          }
           const pair = icons[route.name as keyof typeof icons] ?? icons.more;
           return <Ionicons name={pair[focused ? 1 : 0]} size={size + 1} color={color} />;
         },
@@ -36,9 +43,10 @@ export default function TabsLayout() {
     >
       <Tabs.Screen name="today" options={{ title: 'Heute' }} />
       <Tabs.Screen name="shopping" options={{ title: 'Einkauf' }} />
+      <Tabs.Screen name="add" options={{ title: '' }} />
       <Tabs.Screen name="home" options={{ title: 'Zuhause' }} />
       <Tabs.Screen name="finance" options={{ title: 'Finanzen' }} />
-      <Tabs.Screen name="more" options={{ title: 'Mehr' }} />
+      <Tabs.Screen name="more" options={{ href: null }} />
     </Tabs>
   );
 }
