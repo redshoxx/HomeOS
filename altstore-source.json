@@ -9,11 +9,20 @@
       "bundleIdentifier": "at.homeos.mobile",
       "developerName": "redshoxx",
       "subtitle": "Dein Haushalt. Einfach organisiert.",
-      "localizedDescription": "HomeOS organisiert Einkauf, Vorräte, Aufgaben, Finanzen, Rechnungen und Geräte offline-first mit optionalem Cloud-Sync.",
-      "iconURL": "https://github.com/redshoxx/HomeOS/releases/download/build-23/HomeOS-icon.png",
+      "localizedDescription": "HomeOS bündelt Einkauf, Aufgaben, Vorräte, Finanzen, Rechnungen und Geräte in einer einfachen Oberfläche.",
+      "iconURL": "https://github.com/redshoxx/HomeOS/releases/download/build-24/HomeOS-icon.png",
       "tintColor": "#163C2A",
       "category": "utilities",
       "versions": [
+        {
+          "version": "0.5.0",
+          "buildVersion": "24",
+          "date": "2026-08-14",
+          "localizedDescription": "Neue vereinfachte HomeOS Oberfläche, schnelleres Hinzufügen, optimierte Performance und stabilere Abläufe.",
+          "downloadURL": "https://github.com/redshoxx/HomeOS/releases/download/build-24/HomeOS.ipa",
+          "size": 14539349,
+          "sha256": "c4570879a149ec78dc0278000f0c6f41654378d5cf32dcf706ff2c3bb93efcfb"
+        },
         {
           "version": "0.4.0",
           "buildVersion": "23",
